@@ -49,15 +49,6 @@ int checarVitoria(array<int>^ tabuleiro) {
 	return 0;
 }
 
-
-Mensagem^ deserializeMensagem(String^ mensagem) {
-	StringReader^ stringReader;
-
-	stringReader = gcnew StringReader(mensagem);
-	XmlSerializer^ serializer = gcnew XmlSerializer(Mensagem::typeid);
-	return dynamic_cast<Mensagem^>(serializer->Deserialize(stringReader));
-}
-
 String^ SerializeMensagem(Mensagem^ mensagem) {
 	XmlSerializer^ serializer;
 	StringWriter^ stringWriter;
@@ -68,6 +59,14 @@ String^ SerializeMensagem(Mensagem^ mensagem) {
 	serializer->Serialize(stringWriter, mensagem);
 	//
 	return stringWriter->ToString();
+}
+
+Mensagem^ deserializeMensagem(String^ mensagem) {
+	StringReader^ stringReader;
+
+	stringReader = gcnew StringReader(mensagem);
+	XmlSerializer^ serializer = gcnew XmlSerializer(Mensagem::typeid);
+	return dynamic_cast<Mensagem^>(serializer->Deserialize(stringReader));
 }
 
 String^ receiveDataNetwork(NetworkStream^ stream) {
@@ -98,7 +97,7 @@ String^ receiveDataNetwork(NetworkStream^ stream) {
 	return retorno->ToString();
 }
 
-void sendDataNetwork(Mensagem^ mensagem, NetworkStream^ stream) {
+void sendMessageNetwork(Mensagem^ mensagem, NetworkStream^ stream) {
 	array<Byte>^ bytes = gcnew array<Byte>(BUFFER_SIZE);
 	String^ out;
 
@@ -128,27 +127,27 @@ void server() {
 	TcpListener^ server = gcnew TcpListener(ipAddress, port);
 	server->Start();
 
-	Partida^ first = gcnew Partida();
+	Partida^ partida = gcnew Partida();
 	NetworkStream^ TempStreamPlayer;
 	array<Byte>^bytes = gcnew array<Byte>(BUFFER_SIZE);
 
 
-	first->jogadores = gcnew array<NetworkStream^>(2);
+	partida->jogadores = gcnew array<NetworkStream^>(2);
 
 
-	//Aguarda Player 1
+	//Aguardando Player 1
 	Console::WriteLine("Aguardando conexao de player 1");
 	TcpClient^ client = server->AcceptTcpClient();
 	Console::WriteLine("Cliente conectado!\n");
 	TempStreamPlayer = client->GetStream();
-	first->jogadores[0] = TempStreamPlayer;
+	partida->jogadores[0] = TempStreamPlayer;
 	////
 	
-	//Aguarda Player 2
+	//Aguardando Player 2
 	Console::WriteLine("Aguardando conexao de player 2");
 	client = server->AcceptTcpClient();
 	TempStreamPlayer = client->GetStream();
-	first->jogadores[1] = TempStreamPlayer;
+	partida->jogadores[1] = TempStreamPlayer;
 	Console::WriteLine("Cliente conectado!\n");
 	////
 
@@ -166,11 +165,11 @@ void server() {
 
 			int turnPlayer;
 			for (int k = 0;;k = ++k % 2) {
-				TempStreamPlayer = first->jogadores[k];
+				TempStreamPlayer = partida->jogadores[k];
 
 				xmlSerializer = gcnew XmlSerializer(array<int>::typeid);
 				streamSerializer = gcnew StringWriter();
-				xmlSerializer->Serialize(streamSerializer, first->tabuleiro);
+				xmlSerializer->Serialize(streamSerializer, partida->tabuleiro);
 				////
 
 				//Criando Mensagem
@@ -180,9 +179,7 @@ void server() {
 				streamSerializer->Close();
 				////
 
-				sendDataNetwork(sendMessage, TempStreamPlayer);
-
-				//Thread::Sleep(50);
+				sendMessageNetwork(sendMessage, TempStreamPlayer);
 
 				////Autorizando jogada
 
@@ -191,9 +188,9 @@ void server() {
 				sendMessage->nomeFuncao = "youturn";
 				sendMessage->parametro = "youturn";
 
-				sendDataNetwork(sendMessage, TempStreamPlayer);
+				sendMessageNetwork(sendMessage, TempStreamPlayer);
 
-				imprimirTabuleiro(first->tabuleiro);
+				imprimirTabuleiro(partida->tabuleiro);
 
 
 
@@ -204,18 +201,18 @@ void server() {
 
 
 				if (k == 0) {
-					first->tabuleiro[Convert::ToInt32(out->parametro) - 1] = -1;
+					partida->tabuleiro[Convert::ToInt32(out->parametro) - 1] = -1;
 				}
 				else {
-					first->tabuleiro[Convert::ToInt32(out->parametro) - 1] = 1;
+					partida->tabuleiro[Convert::ToInt32(out->parametro) - 1] = 1;
 				}
-				imprimirTabuleiro(first->tabuleiro);
+				imprimirTabuleiro(partida->tabuleiro);
 				/////
 
 				//Serializando tabuleiro
 				xmlSerializer = gcnew XmlSerializer(array<int>::typeid);
 				streamSerializer = gcnew StringWriter();
-				xmlSerializer->Serialize(streamSerializer, first->tabuleiro);
+				xmlSerializer->Serialize(streamSerializer, partida->tabuleiro);
 
 				//Criando Mensagem
 				sendMessage = gcnew Mensagem();
@@ -230,28 +227,29 @@ void server() {
 
 				data = Text::Encoding::ASCII->GetBytes(streamSerializer->ToString());
 				streamSerializer->Close();
-				for (int i = 0; i < first->jogadores->Length; i++) {
-					TempStreamPlayer = first->jogadores[i];
+				for (int i = 0; i < partida->jogadores->Length; i++) {
+					TempStreamPlayer = partida->jogadores[i];
 					bytes = BitConverter::GetBytes(streamSerializer->ToString()->Length);
 					TempStreamPlayer->Write(bytes, 0, 4);
 
 					TempStreamPlayer->Write(data, 0, data->Length);
 				}
 
-				if (checarVitoria(first->tabuleiro) != 0) {
+				if (checarVitoria(partida->tabuleiro) != 0) {
 					if (k == 0) {
-						//Criando Mensagem
+						//Criando Mensagem para player 1
 						sendMessage = gcnew Mensagem();
 						sendMessage->nomeFuncao = "resultado";
 						sendMessage->parametro = "Voce ganhou!";
 
-						//Serializando Mensagem a ser enviada
-						xmlSerializer = gcnew XmlSerializer(Mensagem::typeid);
-						streamSerializer = gcnew StringWriter();
-						xmlSerializer->Serialize(streamSerializer, sendMessage);
+						TempStreamPlayer = partida->jogadores[0];
+						sendMessageNetwork(sendMessage, TempStreamPlayer);
 
-						data = Text::Encoding::ASCII->GetBytes(streamSerializer->ToString());
-						TempStreamPlayer->Write(data, 0, data->Length);
+
+						//Criar Mensagem para player 2
+						TempStreamPlayer = partida->jogadores[1];
+						sendMessage->parametro = "Voce perdeu!";
+						sendMessageNetwork(sendMessage, TempStreamPlayer);
 						break;
 					}
 					else {
@@ -302,7 +300,7 @@ void client() {
 	Mensagem^ receiveMessage;
 	array<int>^ tabuleiro;
 
-	while (true) {
+	while (stream != nullptr) {
 		try {
 
 			//Receber Mensagem
@@ -331,8 +329,13 @@ void client() {
 				sendMessage->nomeFuncao = "jogada";
 				sendMessage->parametro = Console::ReadLine();
 
-				sendDataNetwork(sendMessage, stream);
+				sendMessageNetwork(sendMessage, stream);
 				/////////
+			}
+			else if (receiveMessage->nomeFuncao == "resultado") {
+				Console::WriteLine(receiveMessage->parametro);
+				stream->Close();
+				stream = nullptr;
 			}
 		}
 		catch (IOException^ e) {
@@ -360,7 +363,6 @@ int main(array<System::String ^> ^args)
 	else if (input == "3") {
 		Int32 port = 1000;
 		TcpClient^ client = gcnew TcpClient("192.168.25.50", port);
-
 		NetworkStream^ stream = client->GetStream();
 	}
 	else {
