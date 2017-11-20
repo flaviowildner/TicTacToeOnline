@@ -7,6 +7,7 @@ using namespace System::Net;
 using namespace System::Net::Sockets;
 using namespace System::IO;
 using namespace System::Collections;
+using namespace System::Collections::Generic;
 
 public ref class Partida
 {
@@ -15,6 +16,7 @@ public:
 	~Partida();
 
 	array<int>^ tabuleiro;
-	array<NetworkStream^>^ jogadores;
+	List<NetworkStream^>^ jogadores;
+	List<NetworkStream^>^ espectadores;
 };
 
