@@ -27,7 +27,8 @@ using namespace std;
 #define RESULTADO "3"
 #define GANHOU "4"
 #define PERDEU "5"
-#define JOGAR_NOVAMENTE "6"
+#define VELHA "6"
+#define JOGAR_NOVAMENTE "7"
 #define ID_PLAYER "8"
 
 ////
@@ -60,9 +61,15 @@ void imprimirTabuleiro(array<int>^ tabuleiro) {
 
 int checarVitoria(array<int>^ tabuleiro) {
 	static int wins[8][3] = { { 0,1,2 },{ 3,4,5 },{ 6,7,8 },{ 0,3,6 },{ 1,4,7 },{ 2,5,8 },{ 0,4,8 },{ 2,4,6 } };
-	for (int i = 0; i<8; i++) {
+	for (int i = 0; i<8; i++){
 		if (tabuleiro[wins[i][0]] != 0 && tabuleiro[wins[i][0]] == tabuleiro[wins[i][1]] && tabuleiro[wins[i][0]] == tabuleiro[wins[i][2]])
 			return tabuleiro[wins[i][0]];
+	}
+	for (int i = 0, count = 0; i < 9; i++, count++) {
+		if (tabuleiro[i] == 0)
+			break;
+		if (count == 8)
+			return 2;
 	}
 	return 0;
 }
@@ -245,34 +252,48 @@ void server() {
 
 				//Checa se há vitória
 				if (checarVitoria(partida->tabuleiro) != 0) {
-
-					//Envia Mensagem de resultado para player 1
 					tempEnviaMensagem->nomeFuncao = RESULTADO;
-					tempEnviaMensagem->parametro = GANHOU;
-					TempStreamPlayer = partida->jogadores[k];
-					sendMessageNetwork(tempEnviaMensagem, TempStreamPlayer);
 
+					if (checarVitoria(partida->tabuleiro) == 2) {
+						tempEnviaMensagem->parametro = VELHA;
 
-					//Envia Mensagem de resultado para player 1
-					TempStreamPlayer = partida->jogadores[1 - k];
-					tempEnviaMensagem->parametro = PERDEU;
-					sendMessageNetwork(tempEnviaMensagem, TempStreamPlayer);
+						//Envia Mensagem de resultado para player 1
+						TempStreamPlayer = partida->jogadores[k];
+						sendMessageNetwork(tempEnviaMensagem, TempStreamPlayer);
 
-					//Envia Mensagem de resultado para os espectadores
-					tempEnviaMensagem->parametro = "Player " + Convert::ToString(k + 1) + " ganhou";
-					for (int i = 0; i < partida->espectadores->Count; i++) {
-						sendMessageNetwork(tempEnviaMensagem, partida->espectadores[i]);
+						//Envia Mensagem de resultado para player 2
+						TempStreamPlayer = partida->jogadores[1 - k];
+						sendMessageNetwork(tempEnviaMensagem, TempStreamPlayer);
+
+						tempEnviaMensagem->parametro = "Player " + Convert::ToString(k + 1) + " ganhou";
+						for (int i = 0; i < partida->espectadores->Count; i++) {
+							sendMessageNetwork(tempEnviaMensagem, partida->espectadores[i]);
+						}
 					}
+					else {
+						//Envia Mensagem de resultado para player 1
+						tempEnviaMensagem->parametro = GANHOU;
+						TempStreamPlayer = partida->jogadores[k];
+						sendMessageNetwork(tempEnviaMensagem, TempStreamPlayer);
 
+
+						//Envia Mensagem de resultado para player 2
+						TempStreamPlayer = partida->jogadores[1 - k];
+						tempEnviaMensagem->parametro = PERDEU;
+						sendMessageNetwork(tempEnviaMensagem, TempStreamPlayer);
+
+						//Envia Mensagem de resultado para os espectadores
+						tempEnviaMensagem->parametro = "Player " + Convert::ToString(k + 1) + " ganhou";
+						for (int i = 0; i < partida->espectadores->Count; i++)
+							sendMessageNetwork(tempEnviaMensagem, partida->espectadores[i]);
+					}
 					
 					int n = 0;
 					for (int k = 0; k < 2; k++) {
-
 						tempString->Clear();
 						tempString->Append(receiveDataNetwork(partida->jogadores[k]));
 						tempRecebeMensagem = dynamic_cast<Mensagem^>(deserializeMensagem(tempString->ToString(), Mensagem::typeid));
 						
-
 						if (tempRecebeMensagem->nomeFuncao == JOGAR_NOVAMENTE) {
 							if (tempRecebeMensagem->parametro == "1") {
 								n++;
@@ -306,12 +327,13 @@ void server() {
 }
 
 
-
 void client() {
-	/*Console::WriteLine("Digite a porta: ");
-	Int32 port = Convert::ToInt32(Console::ReadLine());*/
-	Int32 port = 1000;
-	TcpClient^ client = gcnew TcpClient("192.168.25.50", port);
+	Console::WriteLine("Digite o IP: ");
+	String^ ipAdress = Console::ReadLine();
+	Console::WriteLine("Digite a porta: ");
+	Int32 port = Convert::ToInt32(Console::ReadLine());
+
+	TcpClient^ client = gcnew TcpClient(ipAdress, port);
 
 	NetworkStream^ TempStreamServer = client->GetStream();
 
@@ -366,6 +388,9 @@ void client() {
 				}
 				else if (receiveMessage->parametro == PERDEU) {
 					Console::WriteLine("Você perdeu!\n");
+				}
+				else if (receiveMessage->parametro == VELHA) {
+					Console::WriteLine("Velha!\n");
 				}
 
 				Console::WriteLine("Jogar novamente?\n1- Sim\n2- Não");
