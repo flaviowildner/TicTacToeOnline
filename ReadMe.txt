@@ -1,3 +1,5 @@
 TicTacToe Online
 
-Atividade acad�mica de Redes de Computadores
+Uma aplicação do popular "Jogo da Velha" multiplayer utilizando socket TCP.
+
+Atividade acadêmica de Redes de Computadores
