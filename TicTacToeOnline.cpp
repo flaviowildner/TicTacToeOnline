@@ -30,7 +30,6 @@ using namespace std;
 #define VELHA "6"
 #define JOGAR_NOVAMENTE "7"
 #define ID_PLAYER "8"
-
 ////
 
 
@@ -143,18 +142,10 @@ Mensagem^ criarMensagem(String^ nomeFuncao, String^ parametro) {
 
 
 void server() {
-	/*Console::WriteLine("Digite a porta: ");
-	Int32 port = Convert::ToInt32(Console::ReadLine());*/
-	Int32 port = 1000;
+	Console::WriteLine("Digite a porta: ");
+	Int32 port = Convert::ToInt32(Console::ReadLine());
 
-	IPAddress^ ipAddress;
-	for each (auto addr in Dns::GetHostEntry(Dns::GetHostName())->AddressList) {
-		if (addr->AddressFamily == AddressFamily::InterNetwork) {
-			ipAddress = addr;
-			break;
-		}
-	}
-	TcpListener^ server = gcnew TcpListener(ipAddress, port);
+	TcpListener^ server = gcnew TcpListener(port);
 	server->Start();
 
 	Partida^ partida = gcnew Partida();
@@ -209,11 +200,9 @@ void server() {
 				for (int i = 0; i < partida->jogadores->Count; i++) {
 					sendMessageNetwork(tempEnviaMensagem, partida->jogadores[i]);
 				}
-
 				for (int i = 0; i < partida->espectadores->Count; i++) {
 					sendMessageNetwork(tempEnviaMensagem, partida->espectadores[i]);
 				}
-
 
 				////Autorizando jogada
 				//Criando Mensagem
@@ -444,8 +433,13 @@ void specServer(Object^ parametros) {
 
 
 void specClient() {
-	Int32 port = 1000;
-	TcpClient^ client = gcnew TcpClient("192.168.25.50", port);
+	Console::WriteLine("Digite o IP: ");
+	String^ ipAdress = Console::ReadLine();
+	Console::WriteLine("Digite a porta: ");
+	Int32 port = Convert::ToInt32(Console::ReadLine());
+
+
+	TcpClient^ client = gcnew TcpClient(ipAdress, port);
 
 	StringBuilder^ receiveString = gcnew StringBuilder();
 	StringReader^ stringReader;
